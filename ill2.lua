@@ -1,7 +1,9 @@
--- Crear GUI flotante
+-- Servicios
 local Players = game:GetService("Players")
-local localPlayer = Players.LocalPlayer
+local Workspace = game:GetService("Workspace")
+local LocalPlayer = Players.LocalPlayer
 
+-- Crear GUI
 local gui = Instance.new("ScreenGui")
 gui.Name = "KillAllGui"
 gui.ResetOnSpawn = false
@@ -9,90 +11,73 @@ gui.ResetOnSpawn = false
 if syn and syn.protect_gui then
     syn.protect_gui(gui)
 end
-
 gui.Parent = game:GetService("CoreGui")
 
--- Fondo semi-transparente para facilitar toque en móviles
-local background = Instance.new("Frame")
-background.Size = UDim2.new(0, 200, 0, 70)
-background.Position = UDim2.new(0, 15, 0, 15)
-background.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-background.BackgroundTransparency = 0.3
-background.Parent = gui
-background.ZIndex = 9
-background.Active = true
-background.Draggable = true
+-- Frame táctil para Android
+local frame = Instance.new("Frame")
+frame.Size = UDim2.new(0, 220, 0, 70)
+frame.Position = UDim2.new(0, 20, 0, 20)
+frame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+frame.BackgroundTransparency = 0.3
+frame.Parent = gui
+frame.Active = true
+frame.Draggable = true
 
--- Botón de matar
+-- Botón
 local btn = Instance.new("TextButton")
 btn.Size = UDim2.new(1, -20, 1, -20)
 btn.Position = UDim2.new(0, 10, 0, 10)
 btn.BackgroundColor3 = Color3.fromRGB(200, 0, 0)
 btn.TextColor3 = Color3.fromRGB(255, 255, 255)
 btn.Font = Enum.Font.SourceSansBold
-btn.TextSize = 24
-btn.Text = "💀 KILL ALL (EXCEPTO YO)"
-btn.Parent = background
+btn.TextSize = 22
+btn.Text = "💀 KILL ALL (NO PERMISOS)"
+btn.Parent = frame
 btn.BorderSizePixel = 0
-btn.BackgroundTransparency = 0.05
 btn.ZIndex = 10
 
--- Función para matar jugador (Prison Life)
-local function killPlayer(targetPlayer)
-    if not targetPlayer.Character then return end
-    local char = targetPlayer.Character
+-- Función que mata usando rompimiento de Joints
+local function killTarget(char)
+    if not char then return end
 
-    -- Eliminar ForceField para evitar invencibilidad
+    -- Destruir ForceField
     local ff = char:FindFirstChildOfClass("ForceField")
-    if ff then
-        ff:Destroy()
-    end
+    if ff then ff:Destroy() end
 
-    -- Eliminar scripts de regeneración o curación (según nombres comunes en Prison Life)
+    -- Eliminar posibles scripts de curación
     for _, obj in ipairs(char:GetChildren()) do
-        if obj:IsA("Script") or obj:IsA("LocalScript") then
-            local nameLower = obj.Name:lower()
-            if nameLower:find("regen") or nameLower:find("heal") or nameLower:find("recover") then
-                obj:Destroy()
-            end
+        if obj:IsA("Script") and obj.Name:lower():find("regen") then
+            obj:Destroy()
         end
     end
 
-    -- Intentar eliminar cualquier evento de regeneración o conexión peligrosa
-    -- (Ejemplo: conexiones en Humanoid.HealthChanged que regeneran)
+    -- Forzar muerte sin permisos:
+    -- Método 1: Romper joints de todas las partes
+    for _, part in ipairs(char:GetDescendants()) do
+        if part:IsA("BasePart") then
+            part:BreakJoints()
+        end
+    end
+
+    -- Método 2: Clonar y destruir el humanoid para resetear bindings
     local humanoid = char:FindFirstChildOfClass("Humanoid")
     if humanoid then
-        -- Forzar salud a 0 para matar
-        humanoid.Health = 0
-
-        -- También forzar estado muerto
-        humanoid:ChangeState(Enum.HumanoidStateType.Dead)
+        local clone = humanoid:Clone()
+        humanoid:Destroy()
+        clone.Parent = char
+        clone.Health = 0
+        clone:ChangeState(Enum.HumanoidStateType.Dead)
     end
 end
 
--- Confirmación para evitar toque accidental (en móviles es importante)
-local confirm = false
+-- Ejecutar al hacer clic
 btn.MouseButton1Click:Connect(function()
-    if not confirm then
-        btn.Text = "¿CONFIRMAR? 🔥"
-        confirm = true
-        -- Resetear confirmación en 3 segundos
-        delay(3, function()
-            confirm = false
-            btn.Text = "💀 KILL ALL (EXCEPTO YO)"
-        end)
-        return
-    end
-
-    -- Confirmado: matar a todos menos a localPlayer
-    for _, player in pairs(Players:GetPlayers()) do
-        if player ~= localPlayer then
-            killPlayer(player)
+    for _, plr in ipairs(Players:GetPlayers()) do
+        if plr ~= LocalPlayer and plr.Character then
+            killTarget(plr.Character)
         end
     end
-
-    btn.Text = "✔ TODOS MUERTOS"
+    btn.Text = "✔ MUERTOS"
     wait(2)
-    btn.Text = "💀 KILL ALL (EXCEPTO YO)"
-    confirm = false
+    btn.Text = "💀 KILL ALL (NO PERMISOS)"
 end)
